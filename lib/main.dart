@@ -68,7 +68,8 @@ class AppInfoScreen extends StatelessWidget {
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 40)),
-                              Text(snapshot.data.getVersionInfo())
+                              Text(snapshot.data.getVersionInfo()),
+                              Text("无需更新")
                             ],
                           ),
                         )
@@ -102,7 +103,7 @@ class InstalledAppsScreen extends StatelessWidget {
                                   child: Image.memory(app.icon),
                                 ),
                                 title: Text(app.name),
-                                subtitle: Text(app.getVersionInfo()),
+                                subtitle: Text(app.getVersionInfo()  + " [无需更新]"),
                                 onTap: () =>
                                     InstalledApps.startApp(app.packageName),
                                 onLongPress: () =>
