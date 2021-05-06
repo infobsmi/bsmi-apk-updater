@@ -152,26 +152,18 @@ class AppInfoScreen extends StatelessWidget {
   }
 }
 
-class InstalledAppsScreen extends StatefulWidget {
-
-  const InstalledAppsScreen({ Key? key }) : super(key: key);
-  @override
-  InstalledAppsScreenState createState() => installedAppsScreenState();
-
-}
-
-class InstalledAppsScreenState extends State<InstalledAppsScreen> {
-  @override
-  void initState() {
-    super.initState();
-  }
+class InstalledAppsScreen extends StatelessWidget {
 
 
 
-  SharedPreferences prefs = await SharedPreferences.getInstance();
+
+
+
 
   Future<String> buildVersionNumber(String versionInfo, String packageName) async {
 
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    developer.log(packageName + ":version");
     if (prefs.get(packageName + ":version") != null) {
       developer.log("installed app: $packageName it's version: $versionInfo");
     }
@@ -207,8 +199,18 @@ class InstalledAppsScreenState extends State<InstalledAppsScreen> {
                                   child: Image.memory(app.icon),
                                 ),
                                 title: Text(app.name),
-                                subtitle: Text(await buildVersionNumber(app.getVersionInfo(), app.packageName)),
-                                onTap: () =>
+                                subtitle: FutureBuilder<String> (
+                                  future: buildVersionNumber(app.getVersionInfo(), app.packageName),
+                                      builder: (BuildContext buildContext, AsyncSnapshot<String> snapshot) {
+                                    return snapshot.connectionState == ConnectionState.done
+                                        ? snapshot.hasData
+                                        ? Text(snapshot.data)
+                                        : Text("Error when get version number")
+                                   : Text("Queryring update")
+                                    ;
+                              },
+                                ),
+                                    onTap: () =>
                                     InstalledApps.startApp(app.packageName),
                                 onLongPress: () =>
                                     InstalledApps.openSettings(app.packageName),
