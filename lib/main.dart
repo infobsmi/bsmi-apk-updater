@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:http/http.dart' as http;
+import 'dart:developer' as developer;
+
 
 Future<List<UpdateItem>> fetchAlbum() async {
   final response = await http.get(Uri.https('update.bsmi.info', 'api/'));
@@ -11,6 +13,7 @@ Future<List<UpdateItem>> fetchAlbum() async {
   if (response.statusCode == 200) {
     // If the server did return a 200 OK response,
     // then parse the JSON.
+    developer.log("response.body:", error: response.body);
     return (jsonDecode(response.body) as List)
         .map((i) => UpdateItem.fromJson(i))
         .toList();
