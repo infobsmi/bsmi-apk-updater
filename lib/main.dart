@@ -9,7 +9,7 @@ import 'dart:developer' as developer;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<List<UpdateItem>> fetchAlbum() async {
+Future<Map<String, UpdateItem>> fetchAlbum() async  {
   var installedAppFuture = await InstalledApps.getInstalledApps(true, true);
 
   List<String> installedAppList = List<String>.empty(growable: true);
@@ -17,23 +17,28 @@ Future<List<UpdateItem>> fetchAlbum() async {
     installedAppList.add(element.packageName);
   });
 
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  final response = await http.get(Uri.https('update.bsmi.info', 'api/'));
+
+  final response = await http.post(Uri.https('update.bsmi.info', 'api/'),
+    headers: <String, String>{
+    'Content-Type': 'application/json; charset=UTF-8',
+  },
+    body: jsonEncode(<String, List<String>>{
+      'appList': installedAppList,
+    }),);
 
   if (response.statusCode == 200) {
     // If the server did return a 200 OK response,
     // then parse the JSON.
     //   developer.log("response.body:", error: response.body);
-    var outList = (jsonDecode(response.body) as List)
+    var bodyList =  (jsonDecode(response.body) as List)
         .map((i) => UpdateItem.fromJson(i))
-        .toList();
-    outList.forEach((j) {
-      if (installedAppList.contains(j.guid)) {
-        prefs.setString(j.guid + ':version', j.version);
-        prefs.setString(j.guid + ":link", j.link);
-      }
+        .toList();;
+    var outMap = new Map<String, UpdateItem>();
+    bodyList.forEach((element) {
+      outMap[element.guid] = element;
     });
-    return outList;
+    developer.log("outMap: ", error: outMap.toString());
+    return outMap;
   } else {
     // If the server did not return a 200 OK response,
     // then throw an exception.
@@ -155,18 +160,34 @@ class AppInfoScreen extends StatelessWidget {
 class InstalledAppsScreen extends StatelessWidget {
 
 
+  Map<String, UpdateItem> updateInfo;
+  List<AppInfo> appInfo;
+
+InstalledAppsScreen({this.updateInfo});
 
 
 
-
+  Future queryAppUpdate() async {
+    appInfo =  await InstalledApps.getInstalledApps(true, true);
+    updateInfo = await fetchAlbum();
+  }
 
   Future<String> buildVersionNumber(String versionInfo, String packageName) async {
 
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    developer.log(packageName + ":version");
-    if (prefs.get(packageName + ":version") != null) {
-      developer.log("installed app: $packageName it's version: $versionInfo");
+
+    if (updateInfo.containsKey(packageName)) {
+      var tmpUpdateInfo = updateInfo[packageName];
+     // var tmpStr = tmpUpdateInfo.toString();
+      developer.log("Find the updateInfo: packageName: " + tmpUpdateInfo.guid + tmpUpdateInfo.link );
+     // if (tmpUpdateInfo.version != versionInfo) {
+        return "需要更新: " + tmpUpdateInfo.link;
+    //  }
     }
+
+    developer.log(packageName + ":version");
+
+      developer.log("installed app: $packageName it's version: $versionInfo");
+
     return (versionInfo + " [无需更新]");
 
   }
@@ -180,18 +201,19 @@ class InstalledAppsScreen extends StatelessWidget {
         appBar: AppBar(
           title: Text("Installed Apps"),
         ),
-        body: FutureBuilder<List<AppInfo>>(
-            future: InstalledApps.getInstalledApps(true, true),
+        body: FutureBuilder(
+            future: queryAppUpdate(),
             builder: (BuildContext buildContext,
-                AsyncSnapshot<List<AppInfo>> snapshot) {
+                  snapshot) {
               return snapshot.connectionState == ConnectionState.done
-                  ? snapshot.hasData
+
                       ? ListView.builder(
-                          itemCount: snapshot.data.length,
+                          itemCount: appInfo.length,
                           itemBuilder: (context, index) {
-                            AppInfo app = snapshot.data[index];
+                            AppInfo app = appInfo[index];
                             developer.log("the appInfo:",
                                 error: app.packageName);
+                            developer.log("the appVersion", error: app.getVersionInfo());
                             return Card(
                               child: ListTile(
                                 leading: CircleAvatar(
@@ -217,9 +239,6 @@ class InstalledAppsScreen extends StatelessWidget {
                               ),
                             );
                           })
-                      : Center(
-                          child: Text(
-                              "Error occurred while getting installed apps ...."))
                   : Center(child: Text("Getting installed apps ...."));
             }));
   }
@@ -230,12 +249,14 @@ class InstalledAppsScreen extends StatelessWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
-  Future<List<UpdateItem>> futureAlbum;
+  Future<Map<String, UpdateItem>> futureAlbum;
+  Map<String, UpdateItem> updateInfo;
 
   @override
   void initState() {
     super.initState();
-    futureAlbum = fetchAlbum();
+    fetchAlbum().then((value) => {updateInfo = value});
+    developer.log("updateInfo : ", error: jsonEncode(updateInfo));
   }
 
   void _showDialog(BuildContext context, String text) {
@@ -276,7 +297,9 @@ class _MyHomePageState extends State<MyHomePage> {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => InstalledAppsScreen()),
+                      builder: (context) => InstalledAppsScreen(
+                         updateInfo: this.updateInfo,
+                      )),
                 ),
               ),
             ),
@@ -331,33 +354,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             : "Requested app in not system app.")),
               ),
             ),
-          ),
-          Center(
-              child: FutureBuilder<List<UpdateItem>>(
-                  future: futureAlbum,
-                  builder: (context, snapshot) {
-                    return snapshot.hasData
-                        ? ListView.builder(
-                            scrollDirection: Axis.vertical,
-                            shrinkWrap: true,
-                            itemCount: snapshot.data.length,
-                            itemBuilder: (context, index) {
-                              var updateItem = snapshot.data[index];
-                              return Card(
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: Colors.transparent,
-                                  ),
-                                  title: Text(updateItem.guid),
-                                  subtitle:
-                                      Text(updateItem.version + " [无需更新]"),
-                                ),
-                              );
-                            })
-                        : Center(
-                            child: Text(
-                                "Error occurred while getting installed apps ...."));
-                  }))
+          )
         ]));
   }
 }
