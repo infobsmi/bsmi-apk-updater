@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
@@ -13,7 +14,7 @@ Future<List<UpdateItem>> fetchAlbum() async {
   if (response.statusCode == 200) {
     // If the server did return a 200 OK response,
     // then parse the JSON.
-    developer.log("response.body:", error: response.body);
+ //   developer.log("response.body:", error: response.body);
     return (jsonDecode(response.body) as List)
         .map((i) => UpdateItem.fromJson(i))
         .toList();
@@ -108,6 +109,9 @@ class AppInfoScreen extends StatelessWidget {
             future: InstalledApps.getAppInfo("com.google.android.gm"),
             builder:
                 (BuildContext buildContext, AsyncSnapshot<AppInfo> snapshot) {
+              if (snapshot.connectionState == ConnectionState.done && snapshot.hasData) {
+                developer.log("Appinfo:", error: jsonEncode(snapshot.data.packageName));
+              }
               return snapshot.connectionState == ConnectionState.done
                   ? snapshot.hasData
                       ? Center(
@@ -140,12 +144,14 @@ class InstalledAppsScreen extends StatelessWidget {
             future: InstalledApps.getInstalledApps(true, true),
             builder: (BuildContext buildContext,
                 AsyncSnapshot<List<AppInfo>> snapshot) {
+
               return snapshot.connectionState == ConnectionState.done
                   ? snapshot.hasData
                       ? ListView.builder(
                           itemCount: snapshot.data.length,
                           itemBuilder: (context, index) {
                             AppInfo app = snapshot.data[index];
+                            developer.log("the appInfo:", error: app.packageName);
                             return Card(
                               child: ListTile(
                                 leading: CircleAvatar(
