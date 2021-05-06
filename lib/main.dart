@@ -1,6 +1,53 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
+import 'package:http/http.dart' as http;
+
+Future<List<UpdateItem>> fetchAlbum() async {
+  final response = await http.get(Uri.https('update.bsmi.info', 'api/'));
+
+  if (response.statusCode == 200) {
+    // If the server did return a 200 OK response,
+    // then parse the JSON.
+    return (jsonDecode(response.body) as List)
+        .map((i) => UpdateItem.fromJson(i))
+        .toList();
+  } else {
+    // If the server did not return a 200 OK response,
+    // then throw an exception.
+    throw Exception('Failed to load album');
+  }
+}
+
+class UpdateItem {
+  /**
+   * "link": "https://apkcombo.com/hack-pubg/com.elhamditarik9.bbattleground/",
+      "guid": "com.elhamditarik9.bbattleground",
+      "ts": "Tue, 05 Apr 2022 12:00:00 +0000",
+      "version": "13.0.2"
+   */
+  final String link;
+  final String guid;
+  final String ts;
+  final String version;
+
+  UpdateItem(
+      {@required this.link,
+      @required this.guid,
+      @required this.ts,
+      @required this.version});
+
+  factory UpdateItem.fromJson(Map<String, dynamic> json) {
+    return UpdateItem(
+      link: json['link'],
+      guid: json['guid'],
+      ts: json['ts'],
+      version: json['version'],
+    );
+  }
+}
 
 void main() {
   runApp(MyApp());
@@ -103,7 +150,8 @@ class InstalledAppsScreen extends StatelessWidget {
                                   child: Image.memory(app.icon),
                                 ),
                                 title: Text(app.name),
-                                subtitle: Text(app.getVersionInfo()  + " [无需更新]"),
+                                subtitle:
+                                    Text(app.getVersionInfo() + " [无需更新]"),
                                 onTap: () =>
                                     InstalledApps.startApp(app.packageName),
                                 onLongPress: () =>
@@ -121,6 +169,13 @@ class InstalledAppsScreen extends StatelessWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
+  Future<List<UpdateItem>> futureAlbum;
+
+  @override
+  void initState() {
+    super.initState();
+    futureAlbum = fetchAlbum();
+  }
 
   void _showDialog(BuildContext context, String text) {
     showDialog(
@@ -148,9 +203,8 @@ class _MyHomePageState extends State<MyHomePage> {
     // fast, so that you can just rebuild anything that needs updating rather
     // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(title: const Text("Installed Apps Example")),
-      body: ListView(
-        children: [
+        appBar: AppBar(title: const Text("Installed Apps Example")),
+        body: ListView(children: [
           Card(
             child: Padding(
               padding: const EdgeInsets.all(8),
@@ -216,9 +270,35 @@ class _MyHomePageState extends State<MyHomePage> {
                             : "Requested app in not system app.")),
               ),
             ),
-          )
-        ],
-      ),
+          ),
+          Center(
+              child: FutureBuilder<List<UpdateItem>>(
+                  future: futureAlbum,
+                  builder: (context, snapshot) {
+                    return snapshot.hasData
+                        ? ListView.builder(
+                        scrollDirection: Axis.vertical,
+                        shrinkWrap: true,
+                            itemCount: snapshot.data.length,
+                            itemBuilder: (context, index) {
+                              var updateItem = snapshot.data[index];
+                              return Card(
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.transparent,
+                                  ),
+                                  title: Text(updateItem.guid),
+                                  subtitle:
+                                      Text(updateItem.version + " [无需更新]"),
+                                ),
+                              );
+                            })
+                        : Center(
+                            child: Text(
+                                "Error occurred while getting installed apps ...."));
+                  }))
+        ]
+        )
     );
   }
 }
