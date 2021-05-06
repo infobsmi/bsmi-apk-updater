@@ -7,21 +7,37 @@ import 'package:installed_apps/installed_apps.dart';
 import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
 
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<List<UpdateItem>> fetchAlbum() async {
+  var installedAppFuture = await InstalledApps.getInstalledApps(true, true);
+
+  List<String> installedAppList = List<String>.empty(growable: true);
+  installedAppFuture.forEach((element) {
+    installedAppList.add(element.packageName);
+  });
+
+  SharedPreferences prefs = await SharedPreferences.getInstance();
   final response = await http.get(Uri.https('update.bsmi.info', 'api/'));
 
   if (response.statusCode == 200) {
     // If the server did return a 200 OK response,
     // then parse the JSON.
- //   developer.log("response.body:", error: response.body);
-    return (jsonDecode(response.body) as List)
+    //   developer.log("response.body:", error: response.body);
+    var outList = (jsonDecode(response.body) as List)
         .map((i) => UpdateItem.fromJson(i))
         .toList();
+    outList.forEach((j) {
+      if (installedAppList.contains(j.guid)) {
+        prefs.setString(j.guid + ':version', j.version);
+        prefs.setString(j.guid + ":link", j.link);
+      }
+    });
+    return outList;
   } else {
     // If the server did not return a 200 OK response,
     // then throw an exception.
-    throw Exception('Failed to load album');
+    throw Exception('Failed to load ');
   }
 }
 
@@ -99,6 +115,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class AppInfoScreen extends StatelessWidget {
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -109,8 +126,10 @@ class AppInfoScreen extends StatelessWidget {
             future: InstalledApps.getAppInfo("com.google.android.gm"),
             builder:
                 (BuildContext buildContext, AsyncSnapshot<AppInfo> snapshot) {
-              if (snapshot.connectionState == ConnectionState.done && snapshot.hasData) {
-                developer.log("Appinfo:", error: jsonEncode(snapshot.data.packageName));
+              if (snapshot.connectionState == ConnectionState.done &&
+                  snapshot.hasData) {
+                developer.log("Appinfo:",
+                    error: jsonEncode(snapshot.data.packageName));
               }
               return snapshot.connectionState == ConnectionState.done
                   ? snapshot.hasData
@@ -133,9 +152,38 @@ class AppInfoScreen extends StatelessWidget {
   }
 }
 
-class InstalledAppsScreen extends StatelessWidget {
+class InstalledAppsScreen extends StatefulWidget {
+
+  const InstalledAppsScreen({ Key? key }) : super(key: key);
+  @override
+  InstalledAppsScreenState createState() => installedAppsScreenState();
+
+}
+
+class InstalledAppsScreenState extends State<InstalledAppsScreen> {
+  @override
+  void initState() {
+    super.initState();
+  }
+
+
+
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  Future<String> buildVersionNumber(String versionInfo, String packageName) async {
+
+    if (prefs.get(packageName + ":version") != null) {
+      developer.log("installed app: $packageName it's version: $versionInfo");
+    }
+    return (versionInfo + " [无需更新]");
+
+  }
+
   @override
   Widget build(BuildContext context) {
+
+
+
     return Scaffold(
         appBar: AppBar(
           title: Text("Installed Apps"),
@@ -144,14 +192,14 @@ class InstalledAppsScreen extends StatelessWidget {
             future: InstalledApps.getInstalledApps(true, true),
             builder: (BuildContext buildContext,
                 AsyncSnapshot<List<AppInfo>> snapshot) {
-
               return snapshot.connectionState == ConnectionState.done
                   ? snapshot.hasData
                       ? ListView.builder(
                           itemCount: snapshot.data.length,
                           itemBuilder: (context, index) {
                             AppInfo app = snapshot.data[index];
-                            developer.log("the appInfo:", error: app.packageName);
+                            developer.log("the appInfo:",
+                                error: app.packageName);
                             return Card(
                               child: ListTile(
                                 leading: CircleAvatar(
@@ -159,8 +207,7 @@ class InstalledAppsScreen extends StatelessWidget {
                                   child: Image.memory(app.icon),
                                 ),
                                 title: Text(app.name),
-                                subtitle:
-                                    Text(app.getVersionInfo() + " [无需更新]"),
+                                subtitle: Text(await buildVersionNumber(app.getVersionInfo(), app.packageName)),
                                 onTap: () =>
                                     InstalledApps.startApp(app.packageName),
                                 onLongPress: () =>
@@ -174,6 +221,9 @@ class InstalledAppsScreen extends StatelessWidget {
                   : Center(child: Text("Getting installed apps ...."));
             }));
   }
+
+
+
 }
 
 class _MyHomePageState extends State<MyHomePage> {
@@ -286,8 +336,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   builder: (context, snapshot) {
                     return snapshot.hasData
                         ? ListView.builder(
-                        scrollDirection: Axis.vertical,
-                        shrinkWrap: true,
+                            scrollDirection: Axis.vertical,
+                            shrinkWrap: true,
                             itemCount: snapshot.data.length,
                             itemBuilder: (context, index) {
                               var updateItem = snapshot.data[index];
@@ -306,8 +356,6 @@ class _MyHomePageState extends State<MyHomePage> {
                             child: Text(
                                 "Error occurred while getting installed apps ...."));
                   }))
-        ]
-        )
-    );
+        ]));
   }
 }
