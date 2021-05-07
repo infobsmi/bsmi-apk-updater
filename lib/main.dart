@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+
 import 'dart:developer' as developer;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<Map<String, UpdateItem>> fetchAlbum() async  {
+Future<Map<String, UpdateItem>> fetchAlbum() async {
   var installedAppFuture = await InstalledApps.getInstalledApps(true, true);
 
   List<String> installedAppList = List<String>.empty(growable: true);
@@ -17,27 +19,29 @@ Future<Map<String, UpdateItem>> fetchAlbum() async  {
     installedAppList.add(element.packageName);
   });
 
-
-  final response = await http.post(Uri.https('update.bsmi.info', 'api/'),
+  final response = await http.post(
+    Uri.https('update.bsmi.info', 'api/'),
     headers: <String, String>{
-    'Content-Type': 'application/json; charset=UTF-8',
-  },
+      'Content-Type': 'application/json; charset=UTF-8',
+    },
     body: jsonEncode(<String, List<String>>{
       'appList': installedAppList,
-    }),);
+    }),
+  );
 
   if (response.statusCode == 200) {
     // If the server did return a 200 OK response,
     // then parse the JSON.
     //   developer.log("response.body:", error: response.body);
-    var bodyList =  (jsonDecode(response.body) as List)
+    var bodyList = (jsonDecode(response.body) as List)
         .map((i) => UpdateItem.fromJson(i))
-        .toList();;
+        .toList();
+    ;
     var outMap = new Map<String, UpdateItem>();
     bodyList.forEach((element) {
       outMap[element.guid] = element;
     });
-    developer.log("outMap: ", error: outMap.toString());
+    //developer.log("outMap: ", error: outMap.toString());
     return outMap;
   } else {
     // If the server did not return a 200 OK response,
@@ -83,7 +87,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Android应用升级检测程序',
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -96,7 +100,7 @@ class MyApp extends StatelessWidget {
         // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: MyHomePage(title: 'Android应用升级检测程序'),
     );
   }
 }
@@ -119,132 +123,99 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
-class AppInfoScreen extends StatelessWidget {
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(
-          title: Text("App Info"),
-        ),
-        body: FutureBuilder<AppInfo>(
-            future: InstalledApps.getAppInfo("com.google.android.gm"),
-            builder:
-                (BuildContext buildContext, AsyncSnapshot<AppInfo> snapshot) {
-              if (snapshot.connectionState == ConnectionState.done &&
-                  snapshot.hasData) {
-                developer.log("Appinfo:",
-                    error: jsonEncode(snapshot.data.packageName));
-              }
-              return snapshot.connectionState == ConnectionState.done
-                  ? snapshot.hasData
-                      ? Center(
-                          child: Column(
-                            children: [
-                              Image.memory(snapshot.data.icon),
-                              Text(snapshot.data.name,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 40)),
-                              Text(snapshot.data.getVersionInfo()),
-                              Text("无需更新")
-                            ],
-                          ),
-                        )
-                      : Center(child: Text("Erro while getting app info ...."))
-                  : Center(child: Text("Getting app info ...."));
-            }));
-  }
-}
+
+
+void _openUrl(String _url) async => await canLaunch(_url)
+    ? await launch(_url)
+    : throw 'Could not launch $_url';
 
 class InstalledAppsScreen extends StatelessWidget {
-
-
   Map<String, UpdateItem> updateInfo;
   List<AppInfo> appInfo;
 
-InstalledAppsScreen({this.updateInfo});
-
-
+  InstalledAppsScreen({this.updateInfo});
 
   Future queryAppUpdate() async {
-    appInfo =  await InstalledApps.getInstalledApps(true, true);
+    appInfo = await InstalledApps.getInstalledApps(true, true);
     updateInfo = await fetchAlbum();
   }
 
-  Future<String> buildVersionNumber(String versionInfo, String packageName) async {
-
-
+  Future<UpdateItem> buildVersionNumber(
+      String versionName, String packageName) async {
     if (updateInfo.containsKey(packageName)) {
       var tmpUpdateInfo = updateInfo[packageName];
-     // var tmpStr = tmpUpdateInfo.toString();
-      developer.log("Find the updateInfo: packageName: " + tmpUpdateInfo.guid + tmpUpdateInfo.link );
-     // if (tmpUpdateInfo.version != versionInfo) {
-        return "需要更新: " + tmpUpdateInfo.link;
-    //  }
+      // var tmpStr = tmpUpdateInfo.toString();
+      developer.log("Find the updateInfo: packageName: " +
+          tmpUpdateInfo.guid +
+          tmpUpdateInfo.link);
+      if (tmpUpdateInfo.version != versionName) {
+        return tmpUpdateInfo;
+      }
     }
 
     developer.log(packageName + ":version");
 
-      developer.log("installed app: $packageName it's version: $versionInfo");
+    developer.log("installed app: $packageName it's version: $versionName");
 
-    return (versionInfo + " [无需更新]");
-
+    return UpdateItem(
+        link: "", guid: packageName, version: versionName, ts: '');
   }
+
 
   @override
   Widget build(BuildContext context) {
-
-
-
     return Scaffold(
         appBar: AppBar(
-          title: Text("Installed Apps"),
+          title: Text("已安装应用列表"),
         ),
         body: FutureBuilder(
             future: queryAppUpdate(),
-            builder: (BuildContext buildContext,
-                  snapshot) {
+            builder: (BuildContext buildContext, snapshot) {
               return snapshot.connectionState == ConnectionState.done
-
-                      ? ListView.builder(
-                          itemCount: appInfo.length,
-                          itemBuilder: (context, index) {
-                            AppInfo app = appInfo[index];
-                            developer.log("the appInfo:",
-                                error: app.packageName);
-                            developer.log("the appVersion", error: app.getVersionInfo());
-                            return Card(
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Colors.transparent,
-                                  child: Image.memory(app.icon),
-                                ),
-                                title: Text(app.name),
-                                subtitle: FutureBuilder<String> (
-                                  future: buildVersionNumber(app.getVersionInfo(), app.packageName),
-                                      builder: (BuildContext buildContext, AsyncSnapshot<String> snapshot) {
-                                    return snapshot.connectionState == ConnectionState.done
-                                        ? snapshot.hasData
-                                        ? Text(snapshot.data)
+                  ? ListView.builder(
+                      itemCount: appInfo.length,
+                      itemBuilder: (context, index) {
+                        AppInfo app = appInfo[index];
+                        developer.log("the appInfo:" + app.packageName  + " the appVersion: " + app.versionName);
+                        return Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.transparent,
+                              child: Image.memory(app.icon),
+                            ),
+                            title: Text(app.name),
+                            subtitle: FutureBuilder<UpdateItem>(
+                              future: buildVersionNumber(
+                                  app.versionName, app.packageName),
+                              builder: (BuildContext buildContext,
+                                  AsyncSnapshot<UpdateItem> snapshot) {
+                                return snapshot.connectionState ==
+                                        ConnectionState.done
+                                    ? snapshot.hasData
+                                        ? (snapshot.data.link == ""
+                                            ? Text(snapshot.data.version)
+                                            : InkWell(
+                                                onTap: () {
+                                                  _openUrl(snapshot.data.link);
+                                                },
+                                                child: Text("需要升级，当前版本：" +
+                                                    app.versionName +
+                                                    ", 最新版本：" +
+                                                    snapshot.data.version),
+                                              ))
                                         : Text("Error when get version number")
-                                   : Text("Queryring update")
-                                    ;
+                                    : Text("Queryring update");
                               },
-                                ),
-                                    onTap: () =>
-                                    InstalledApps.startApp(app.packageName),
-                                onLongPress: () =>
-                                    InstalledApps.openSettings(app.packageName),
-                              ),
-                            );
-                          })
+                            ),
+                            /*onLongPress: () =>
+                                InstalledApps.openSettings(app.packageName),*/
+                          ),
+                        );
+                      })
                   : Center(child: Text("Getting installed apps ...."));
             }));
   }
-
-
-
 }
 
 class _MyHomePageState extends State<MyHomePage> {
@@ -285,73 +256,33 @@ class _MyHomePageState extends State<MyHomePage> {
     // fast, so that you can just rebuild anything that needs updating rather
     // than having to individually change instances of widgets.
     return Scaffold(
-        appBar: AppBar(title: const Text("Installed Apps Example")),
+        appBar: AppBar(title: const Text("Android应用升级检测程序")),
         body: ListView(children: [
           Card(
             child: Padding(
               padding: const EdgeInsets.all(8),
               child: ListTile(
-                title: Text("Installed Apps"),
+                title: Text("己安装应用列表"),
                 subtitle: Text(
-                    "Get installed apps on device. With options to exclude system app, get app icon & matching package name prefix."),
+                    "获取系统己安装的应用列表，并检测更新"),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (context) => InstalledAppsScreen(
-                         updateInfo: this.updateInfo,
-                      )),
+                            updateInfo: this.updateInfo,
+                          )),
                 ),
               ),
             ),
           ),
+
           Card(
             child: Padding(
               padding: const EdgeInsets.all(8),
               child: ListTile(
-                title: Text("App Info"),
-                subtitle: Text("Get app info with package name"),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => AppInfoScreen()),
-                ),
-              ),
-            ),
-          ),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: ListTile(
-                title: Text("Start App"),
-                subtitle: Text(
-                    "Start app with package name. Get callback of success or failure."),
-                onTap: () => InstalledApps.startApp("com.google.android.gm"),
-              ),
-            ),
-          ),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: ListTile(
-                title: Text("Go To App Settings Screen"),
-                subtitle: Text(
-                    "Directly navigate to app settings screen with package name"),
-                onTap: () =>
-                    InstalledApps.openSettings("com.google.android.gm"),
-              ),
-            ),
-          ),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: ListTile(
-                title: Text("Check If System App"),
-                subtitle: Text("Check if app is system app with package name"),
-                onTap: () => InstalledApps.isSystemApp("com.google.android.gm")
-                    .then((value) => _showDialog(
-                        context,
-                        value
-                            ? "The requested app is system app."
-                            : "Requested app in not system app.")),
+                title: Text("开发者"),
+                subtitle: Text("版权所有 netroby 2000-2021, 源代码以AGPL 协议开源！"),
+                onTap: () =>  _openUrl("https://www.netroby.com")
               ),
             ),
           )
