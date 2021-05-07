@@ -26,5 +26,16 @@
 ![image](https://user-images.githubusercontent.com/278153/117384486-ac033f00-af15-11eb-9ce1-7e2c65782161.png)
 
 
+下载地址：
 
 https://github.com/cnmade/bsmi-apk-updater/releases/tag/v0.1.0
+
+服务端代码开源：
+https://github.com/cnmade/bsmi-android-update-server
+
+
+注意事项：
+
+有的人会说：啥垃圾软件，我打都打不开。
+
+请注意，你需要给足够的权限，另外要自己解决网络不通的问题。这不是咱这软件的问题，也不是咱能解决的问题。
