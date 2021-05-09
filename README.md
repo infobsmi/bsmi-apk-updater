@@ -1,5 +1,12 @@
 # bsmi_apk_updater
 
+
+Buy me a cup of coffee for $3
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/M4M54KKIF)
+
+
+
 这是 android 应用升级检测程序的首次发布。
 绿色，无污染，就老老实实，本本分分的检测你的android手机上的一些android 应用的升级情况。
 
